@@ -1,0 +1,54 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-background: 220 20% 97%; 
+    --color-foreground: 222.2 84% 4.9%;
+    --color-card: 0 0% 100%;
+    --color-card-foreground: 222.2 84% 4.9%;
+    
+    /* Dashboard primary: Soft purple/blue from Dashboard.png */
+    --color-primary: 243 75% 59%; 
+    --color-primary-foreground: 210 40% 98%;
+    
+    /* Worker/Ruleta: Vibrant green from Ruleta.png */
+    --color-success: 142 71% 45%; 
+    --color-success-foreground: 0 0% 100%;
+    
+    --color-danger: 0 84.2% 60.2%;
+    --color-danger-foreground: 210 40% 98%;
+    --color-muted: 210 20% 96%;
+    --color-muted-foreground: 215.4 16.3% 55%;
+    --color-border: 214.3 31.8% 91.4%;
+  }
+
+  body {
+    background-color: hsl(var(--color-background));
+    color: hsl(var(--color-foreground));
+    font-family: 'Outfit', 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Glassmorphism and specialized gradients */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.ruleta-gradient {
+  background: linear-gradient(135deg, #e0f2e9 0%, #a7d7bc 100%);
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

@@ -1,0 +1,239 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Area {
+  id           String           @id @default(uuid())
+  nombre       String           @unique
+  descripcion  String?
+  activo       Boolean          @default(true)
+  createdAt    DateTime         @default(now()) @map("created_at")
+  sesiones     SesionEncuesta[]
+  trabajadores Trabajador[]
+
+  @@map("areas")
+}
+
+model Periodo {
+  id              String           @id @default(uuid())
+  nombre          String
+  descripcion     String?
+  fechaInicio     DateTime         @map("fecha_inicio")
+  fechaFin        DateTime?        @map("fecha_fin")
+  activo          Boolean          @default(true)
+  createdAt       DateTime         @default(now()) @map("created_at")
+  encuestaConfigs EncuestaConfig[]
+  sesiones        SesionEncuesta[]
+
+  @@map("periodos")
+}
+
+model EncuestaConfig {
+  id           String           @id @default(uuid())
+  periodoId    String           @map("periodo_id")
+  nombre       String
+  tipo         TipoEncuesta
+  /// JSON array de etiquetas de escala: ["Mala","Buena","Muy buena"]
+  escalaLabels String?          @map("escala_labels") @db.Text
+  activo       Boolean          @default(true)
+  createdAt    DateTime         @default(now()) @map("created_at")
+  periodo      Periodo          @relation(fields: [periodoId], references: [id], onDelete: Cascade)
+  sesiones     SesionEncuesta[]
+  grupos       Grupo[]
+
+  @@index([periodoId], map: "encuesta_configs_periodo_id_fkey")
+  @@map("encuesta_configs")
+}
+
+model Grupo {
+  id               String         @id @default(uuid())
+  encuestaConfigId String         @map("encuesta_config_id")
+  nombre           String
+  descripcion      String?
+  orden            Int            @default(0)
+  createdAt        DateTime       @default(now()) @map("created_at")
+  encuestaConfig   EncuestaConfig @relation(fields: [encuestaConfigId], references: [id], onDelete: Cascade)
+  preguntas        Pregunta[]
+  subGrupos        SubGrupo[]
+
+  @@index([encuestaConfigId], map: "grupos_encuesta_config_id_fkey")
+  @@map("grupos")
+}
+
+model SubGrupo {
+  id        String     @id @default(uuid())
+  grupoId   String     @map("grupo_id")
+  nombre    String
+  orden     Int        @default(0)
+  createdAt DateTime   @default(now()) @map("created_at")
+  preguntas Pregunta[]
+  grupo     Grupo      @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+
+  @@index([grupoId], map: "sub_grupos_grupo_id_fkey")
+  @@map("sub_grupos")
+}
+
+model Admin {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("admins")
+}
+
+model Tema {
+  id          String           @id @default(uuid())
+  titulo      String
+  descripcion String?
+  activo      Boolean          @default(true)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  sesiones    SesionEncuesta[]
+  preguntas   Pregunta[]
+
+  @@map("temas")
+}
+
+model Trabajador {
+  id        String           @id @default(uuid())
+  cedula    String           @unique
+  nombres   String
+  apellidos String
+  /// Campo legacy mantenido para compatibilidad. Usar areaId en v2.0
+  area      String           @default("Sin asignar")
+  areaId    String?          @map("area_id")
+  activo    Boolean          @default(true)
+  createdAt DateTime         @default(now()) @map("created_at")
+  sesiones  SesionEncuesta[]
+  areaRel   Area?            @relation(fields: [areaId], references: [id])
+
+  @@index([areaId], map: "trabajadores_area_id_fkey")
+  @@map("trabajadores")
+}
+
+model Pregunta {
+  id                String       @id @default(uuid())
+  enunciado         String       @db.Text
+  /// Solo aplica a preguntas VERDADERO_FALSO. Null para Likert.
+  respuestaCorrecta Boolean?     @map("respuesta_correcta")
+  puntos            Int          @default(10)
+  activo            Boolean      @default(true)
+  orden             Int          @default(0)
+  /// Legacy: asociación directa a Tema (preguntas v1.0)
+  temaId            String?      @map("tema_id")
+  /// v2.0: tipo de pregunta
+  tipoPregunta      TipoPregunta @default(VERDADERO_FALSO) @map("tipo_pregunta")
+  /// v2.0: grupo de primer nivel (Inocuidad, Clima, etc.)
+  grupoId           String?      @map("grupo_id")
+  /// v2.0: subgrupo de segundo nivel (Formación, Comunicación, etc.)
+  subGrupoId        String?      @map("sub_grupo_id")
+  /// v2.0: config de encuesta a la que pertenece
+  encuestaConfigId  String?      @map("encuesta_config_id")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  grupo             Grupo?       @relation(fields: [grupoId], references: [id])
+  subGrupo          SubGrupo?    @relation(fields: [subGrupoId], references: [id])
+  tema              Tema?        @relation(fields: [temaId], references: [id])
+  respuestas        Respuesta[]
+
+  @@index([grupoId], map: "preguntas_grupo_id_fkey")
+  @@index([subGrupoId], map: "preguntas_sub_grupo_id_fkey")
+  @@index([temaId], map: "preguntas_tema_id_fkey")
+  @@map("preguntas")
+}
+
+model Premio {
+  id           String            @id @default(uuid())
+  nombre       String
+  descripcion  String?           @db.Text
+  color        String            @default("#6366f1")
+  probabilidad Decimal           @default(10.00) @db.Decimal(5, 2)
+  activo       Boolean           @default(true)
+  orden        Int               @default(0)
+  createdAt    DateTime          @default(now()) @map("created_at")
+  resultados   ResultadoRuleta[]
+
+  @@map("premios")
+}
+
+model SesionEncuesta {
+  id               String           @id @default(uuid())
+  /// NOMINAL: FK al trabajador. ANONIMA: null (no se registra identidad)
+  trabajadorId     String?          @map("trabajador_id")
+  /// Legacy: tema v1.0
+  temaId           String?          @map("tema_id")
+  /// v2.0: período al que pertenece la sesión
+  periodoId        String?          @map("periodo_id")
+  /// v2.0: config de encuesta respondida
+  encuestaConfigId String?          @map("encuesta_config_id")
+  /// v2.0: token UUID para sesiones anónimas (garantiza una respuesta por dispositivo)
+  anonToken        String?          @unique @map("anon_token") @db.VarChar(36)
+  fechaInicio      DateTime         @default(now()) @map("fecha_inicio")
+  fechaFin         DateTime?        @map("fecha_fin")
+  puntajeTotal     Int              @default(0) @map("puntaje_total")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  /// v2.1: área asociada a la sesión (para reportes agregados anónimos)
+  areaId           String?          @map("area_id")
+  area             Area?            @relation(fields: [areaId], references: [id])
+  encuestaConfig   EncuestaConfig?  @relation(fields: [encuestaConfigId], references: [id])
+  periodo          Periodo?         @relation(fields: [periodoId], references: [id])
+  tema             Tema?            @relation(fields: [temaId], references: [id])
+  trabajador       Trabajador?      @relation(fields: [trabajadorId], references: [id])
+  respuestas       Respuesta[]
+  resultado        ResultadoRuleta?
+
+  @@index([areaId], map: "encuestas_sesiones_area_id_fkey")
+  @@index([encuestaConfigId], map: "encuestas_sesiones_encuesta_config_id_fkey")
+  @@index([periodoId], map: "encuestas_sesiones_periodo_id_fkey")
+  @@index([temaId], map: "encuestas_sesiones_tema_id_fkey")
+  @@index([trabajadorId], map: "encuestas_sesiones_trabajador_id_fkey")
+  @@map("encuestas_sesiones")
+}
+
+model Respuesta {
+  id              String         @id @default(uuid())
+  sesionId        String         @map("sesion_id")
+  preguntaId      String         @map("pregunta_id")
+  /// VERDADERO_FALSO: true/false. LIKERT_3: null (usa valorNumerico)
+  respuestaDada   Boolean?       @map("respuesta_dada")
+  /// LIKERT_3: 1=Mala, 2=Buena, 3=Muy buena. Null para V/F.
+  valorNumerico   Int?           @map("valor_numerico")
+  esCorrecta      Boolean        @map("es_correcta")
+  puntosObtenidos Int            @default(0) @map("puntos_obtenidos")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  pregunta        Pregunta       @relation(fields: [preguntaId], references: [id])
+  sesion          SesionEncuesta @relation(fields: [sesionId], references: [id], onDelete: Cascade)
+
+  @@index([preguntaId], map: "respuestas_pregunta_id_fkey")
+  @@index([sesionId], map: "respuestas_sesion_id_fkey")
+  @@map("respuestas")
+}
+
+model ResultadoRuleta {
+  id         String         @id @default(uuid())
+  sesionId   String         @unique @map("sesion_id")
+  premioId   String         @map("premio_id")
+  obtenidoEn DateTime       @default(now()) @map("obtenido_en")
+  premio     Premio         @relation(fields: [premioId], references: [id])
+  sesion     SesionEncuesta @relation(fields: [sesionId], references: [id], onDelete: Cascade)
+
+  @@index([premioId], map: "resultados_ruleta_premio_id_fkey")
+  @@map("resultados_ruleta")
+}
+
+/// Tipo de encuesta: ANONIMA no registra al trabajador, EVALUACION sí
+enum TipoEncuesta {
+  ANONIMA
+  EVALUACION
+}
+
+/// Tipo de pregunta según el motor que la procesa
+enum TipoPregunta {
+  VERDADERO_FALSO
+  LIKERT_3
+}
